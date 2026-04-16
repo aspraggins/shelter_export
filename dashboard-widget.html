@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Download Data</title>
+  <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css"/>
+  <script src="https://js.arcgis.com/4.29/"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      padding: 12px;
+    }
+
+    #download-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #0079c1;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-family: 'Segoe UI', sans-serif;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+
+    #download-btn:hover { background: #005e95; }
+    #download-btn:disabled { background: #a0a0a0; cursor: not-allowed; }
+
+    #download-btn svg {
+      flex-shrink: 0;
+    }
+
+    #status {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #6b6b6b;
+      text-align: center;
+    }
+
+    .error { color: #c0392b !important; }
+
+    .wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <button id="download-btn">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Download Data
+    </button>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    // =============================================
+    // CONFIGURATION — edit these values
+    // =============================================
+    const DOWNLOAD_APP_URL = "https://yourname.github.io/download-app/";
+    const PORTAL_URL       = "https://www.arcgis.com"; // or your portal URL e.g. https://yourorg.maps.arcgis.com
+    // =============================================
+
+    const btn    = document.getElementById("download-btn");
+    const status = document.getElementById("status");
+
+    require(["esri/identity/IdentityManager", "esri/portal/Portal"], function(esriId, Portal) {
+
+      btn.addEventListener("click", async function () {
+        btn.disabled = true;
+        status.textContent = "Retrieving session…";
+        status.className   = "";
+
+        try {
+          // Try to find an existing credential for this portal
+          let credential = esriId.findCredential(PORTAL_URL);
+
+          if (!credential) {
+            // If not found, attempt a silent check via Portal (user is already
+            // logged in to the Dashboard so this should resolve without a prompt)
+            const portal = new Portal({ url: PORTAL_URL });
+            await portal.load();
+            credential = esriId.findCredential(PORTAL_URL);
+          }
+
+          if (!credential || !credential.token) {
+            throw new Error("Could not retrieve session token. Are you logged in?");
+          }
+
+          const token   = credential.token;
+          const expires = credential.expires; // epoch ms
+
+          // Build the redirect URL
+          const url = new URL(DOWNLOAD_APP_URL);
+          url.searchParams.set("token",   token);
+          url.searchParams.set("expires", expires);
+          url.searchParams.set("portal",  PORTAL_URL);
+
+          status.textContent = "Opening download…";
+
+          // Open in new tab
+          window.open(url.toString(), "_blank");
+
+          status.textContent = "Download page opened.";
+
+        } catch (err) {
+          console.error(err);
+          status.textContent = "Error: " + err.message;
+          status.className   = "error";
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  </script>
+</body>
+</html>
