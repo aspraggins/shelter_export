@@ -81,28 +81,50 @@
     const btn    = document.getElementById("download-btn");
     const status = document.getElementById("status");
 
-    require(["esri/identity/IdentityManager", "esri/portal/Portal"], function(esriId, Portal) {
+require(["esri/identity/IdentityManager", "esri/portal/Portal"], function(esriId, Portal) {
 
-      btn.addEventListener("click", async function () {
-        btn.disabled = true;
-        status.textContent = "Retrieving session…";
-        status.className   = "";
+  btn.addEventListener("click", async function () {
+    btn.disabled = true;
+    status.textContent = "Retrieving session…";
+    status.className   = "";
 
-        try {
-          // Try to find an existing credential for this portal
-          let credential = esriId.findCredential(PORTAL_URL);
+    try {
+      let credential = null;
 
-          if (!credential) {
-            // If not found, attempt a silent check via Portal (user is already
-            // logged in to the Dashboard so this should resolve without a prompt)
-            const portal = new Portal({ url: PORTAL_URL });
-            await portal.load();
-            credential = esriId.findCredential(PORTAL_URL);
+      // 1. Try parent window's IdentityManager (Dashboard runs this in an iframe)
+      try {
+        const parentId = window.parent?.require?.("esri/identity/IdentityManager");
+        if (parentId) {
+          credential = parentId.findCredential(PORTAL_URL);
+          if (credential) {
+            // Register it in this iframe's IdentityManager too
+            esriId.registerToken({
+              server:  PORTAL_URL,
+              token:   credential.token,
+              expires: credential.expires,
+              userId:  credential.userId
+            });
           }
+        }
+      } catch(e) {
+        console.warn("Could not access parent IdentityManager:", e);
+      }
 
-          if (!credential || !credential.token) {
-            throw new Error("Could not retrieve session token. Are you logged in?");
-          }
+      // 2. Fall back to this iframe's own credentials
+      if (!credential) {
+        credential = esriId.findCredential(PORTAL_URL);
+      }
+
+      // 3. Last resort — try loading the Portal to trigger credential resolution
+      if (!credential) {
+        const portal = new Portal({ url: PORTAL_URL });
+        await portal.load();
+        credential = esriId.findCredential(PORTAL_URL);
+      }
+
+      if (!credential || !credential.token) {
+        throw new Error("Could not retrieve session token. Are you logged in?");
+      }
 
           const token   = credential.token;
           const expires = credential.expires; // epoch ms
