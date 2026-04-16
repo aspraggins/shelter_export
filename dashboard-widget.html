@@ -137,7 +137,7 @@
 
 <script>
 // =============================================
-// CONFIGURATION — edit these values
+// CONFIGURATION
 // =============================================
 const CONFIG = {
   clientId:          "JZeMzScpk6eh6BPR",
@@ -145,18 +145,15 @@ const CONFIG = {
   portalUrl:         "https://www.arcgis.com",
 
   featureServiceUrl: "https://services1.arcgis.com/kILp9lqGUeOhnDbI/ArcGIS/rest/services/service_570f1aad0c2641e7beac6dfca700747e/FeatureServer/0",
-  exportFilename:    "export",
+  exportFilename:    "shelter_export",
   pageSize:          2000,
 
-  // Fields to include in export
-  // key = actual field name, value = CSV column header
-  // Fields NOT listed here are excluded (globalid, objectid, etc.)
   fields: {
     "NameShelter": "Shelter Name",
-    "street": "Street",
-    "city": "City",
-    "state": "State",
-    "zip": "Zip"
+    "street":      "Street",
+    "city":        "City",
+    "state":       "State",
+    "zip":         "Zip"
   }
 };
 // =============================================
@@ -224,61 +221,53 @@ function openAuthPopup() {
     expiration:    "120"
   });
   const authUrl = `${CONFIG.portalUrl}/sharing/rest/oauth2/authorize?${params.toString()}`;
-
-  // Open popup centered on screen
   const w = 500, h = 600;
   const left = Math.round(window.screen.width  / 2 - w / 2);
   const top  = Math.round(window.screen.height / 2 - h / 2);
-  authPopup = window.open(
-    authUrl,
-    "agol_auth",
-    `width=${w},height=${h},left=${left},top=${top},toolbar=no,menubar=no`
-  );
+  authPopup = window.open(authUrl, "agol_auth", `width=${w},height=${h},left=${left},top=${top},toolbar=no,menubar=no`);
 
   if (!authPopup) {
     setStatus("error", "Popup was blocked. Please allow popups for this page.");
     return;
   }
-
   loginBtn.disabled = true;
   setStatus("", "Waiting for sign in…");
 }
 
-// Listen for token message from the callback popup
 window.addEventListener("message", function(event) {
-  // Only accept messages from our own origin
   if (event.origin !== "https://aspraggins.github.io") return;
   if (!event.data || event.data.type !== "agol_token") return;
 
   const { token, expires, username } = event.data;
   saveToken(token, expires, username);
-
   if (authPopup) { authPopup.close(); authPopup = null; }
-
   loginBtn.disabled = false;
   showLoggedIn();
   setStatus("success", "Signed in successfully.");
 });
 
 loginBtn.addEventListener("click", openAuthPopup);
-
-logoutBtn.addEventListener("click", function() {
-  clearToken();
-  showLoggedOut();
-});
+logoutBtn.addEventListener("click", function() { clearToken(); showLoggedOut(); });
 
 // --- Feature service fetch with pagination ---
 async function fetchAllFeatures(token) {
   const outFields = Object.keys(CONFIG.fields).join(",");
 
+  // --- Count query ---
   const countUrl = new URL(CONFIG.featureServiceUrl + "/query");
   countUrl.searchParams.set("where",           "1=1");
   countUrl.searchParams.set("returnCountOnly",  "true");
   countUrl.searchParams.set("f",                "json");
   countUrl.searchParams.set("token",            token);
-  const countData = await (await fetch(countUrl.toString())).json();
-  if (countData.error) throw new Error(countData.error.message);
+
+  console.log("[shelter_export] COUNT URL:", countUrl.toString().replace(token, "TOKEN_HIDDEN"));
+  const countResp = await fetch(countUrl.toString());
+  const countData = await countResp.json();
+  console.log("[shelter_export] COUNT RESPONSE:", countData);
+
+  if (countData.error) throw new Error(countData.error.message || JSON.stringify(countData.error));
   const total = countData.count || 0;
+  console.log("[shelter_export] Total records:", total);
 
   let allFeatures = [], offset = 0;
 
@@ -292,8 +281,12 @@ async function fetchAllFeatures(token) {
     url.searchParams.set("f",                 "json");
     url.searchParams.set("token",             token);
 
-    const data = await (await fetch(url.toString())).json();
-    if (data.error) throw new Error(data.error.message);
+    console.log("[shelter_export] QUERY URL:", url.toString().replace(token, "TOKEN_HIDDEN"));
+    const resp = await fetch(url.toString());
+    const data = await resp.json();
+    console.log("[shelter_export] QUERY RESPONSE (first 500 chars):", JSON.stringify(data).substring(0, 500));
+
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
     const features = data.features || [];
     allFeatures = allFeatures.concat(features);
@@ -353,7 +346,7 @@ downloadBtn.addEventListener("click", async function() {
     setTimeout(() => setProgress(0), 2000);
 
   } catch(err) {
-    console.error(err);
+    console.error("[shelter_export] DOWNLOAD ERROR:", err);
     if (err.message?.includes("498") || err.message?.includes("499") || err.message?.toLowerCase().includes("token")) {
       clearToken(); showLoggedOut();
       setStatus("error", "Session expired — please sign in again.");
