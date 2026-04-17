@@ -315,10 +315,19 @@ function exportCSV(features) {
   const csv  = Papa.unparse(rows, { columns: fieldLabels });
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
-  a.href = url; a.download = CONFIG.exportFilename + ".csv";
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
+
+  // Open in new tab — direct .click() is blocked inside Dashboard iframes
+  const newTab = window.open(url, "_blank");
+
+  // Fallback: if popup also blocked, show a direct link the user can click
+  if (!newTab) {
+    const a = document.createElement("a");
+    a.href        = url;
+    a.download    = CONFIG.exportFilename + ".csv";
+    a.textContent = "Click here to download your CSV";
+    a.style.cssText = "display:block;margin-top:8px;font-size:12px;color:#0079c1;text-align:center;";
+    document.querySelector(".wrapper").appendChild(a);
+  }
 }
 
 // --- Download handler ---
