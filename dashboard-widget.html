@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Download Data</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <title>Shelter Export</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -48,9 +47,9 @@
     #login-btn:hover:not(:disabled) { background: #005e95; }
     #login-btn:disabled { background: #9ca3af; cursor: not-allowed; }
 
-    #download-btn { background: #0079c1; color: white; }
-    #download-btn:hover:not(:disabled) { background: #005e95; }
-    #download-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+    #open-btn { background: #0079c1; color: white; }
+    #open-btn:hover:not(:disabled) { background: #005e95; }
+    #open-btn:disabled { background: #9ca3af; cursor: not-allowed; }
 
     #logout-btn {
       background: none;
@@ -74,27 +73,11 @@
     }
     #status.error   { color: #dc2626; }
     #status.success { color: #16a34a; }
-    #status.warn    { color: #d97706; }
 
     .user-info {
       font-size: 12px;
       color: #6b7280;
       text-align: center;
-    }
-
-    .progress-wrap {
-      width: 100%;
-      background: #e5e7eb;
-      border-radius: 99px;
-      height: 4px;
-      overflow: hidden;
-      display: none;
-    }
-    .progress-bar {
-      height: 100%;
-      background: #0079c1;
-      width: 0%;
-      transition: width 0.3s;
     }
 
     .spinner {
@@ -121,18 +104,14 @@
 
   <div id="user-info" class="user-info" style="display:none"></div>
 
-  <button id="download-btn" style="display:none">
+  <button id="open-btn" style="display:none">
     <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
       <path d="M7.5 1v9M3.5 7l4 4 4-4M1.5 13h12" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
-    Download CSV
+    Open Download Tool
   </button>
 
   <button id="logout-btn" style="display:none">Sign out</button>
-
-  <div class="progress-wrap" id="progress-wrap">
-    <div class="progress-bar" id="progress-bar"></div>
-  </div>
 </div>
 
 <script>
@@ -140,31 +119,18 @@
 // CONFIGURATION
 // =============================================
 const CONFIG = {
-  clientId:          "JZeMzScpk6eh6BPR",
-  redirectUri:       "https://aspraggins.github.io/shelter_export/oauth-callback.html",
-  portalUrl:         "https://www.arcgis.com",
-
-  featureServiceUrl: "https://services1.arcgis.com/kILp9lqGUeOhnDbI/ArcGIS/rest/services/service_570f1aad0c2641e7beac6dfca700747e/FeatureServer/0",
-  exportFilename:    "shelter_export",
-  pageSize:          2000,
-
-  fields: {
-    "NameShelter": "Shelter Name",
-    "street":      "Street",
-    "city":        "City",
-    "state":       "State",
-    "zip":         "Zip"
-  }
+  clientId:       "JZeMzScpk6eh6BPR",
+  redirectUri:    "https://aspraggins.github.io/shelter_export/oauth-callback.html",
+  portalUrl:      "https://www.arcgis.com",
+  downloadAppUrl: "https://aspraggins.github.io/shelter_export/download-app.html"
 };
 // =============================================
 
-const loginBtn     = document.getElementById("login-btn");
-const downloadBtn  = document.getElementById("download-btn");
-const logoutBtn    = document.getElementById("logout-btn");
-const statusEl     = document.getElementById("status");
-const userInfoEl   = document.getElementById("user-info");
-const progressWrap = document.getElementById("progress-wrap");
-const progressBar  = document.getElementById("progress-bar");
+const loginBtn  = document.getElementById("login-btn");
+const openBtn   = document.getElementById("open-btn");
+const logoutBtn = document.getElementById("logout-btn");
+const statusEl  = document.getElementById("status");
+const userInfoEl= document.getElementById("user-info");
 
 // --- Token helpers ---
 function saveToken(token, expires, username) {
@@ -186,34 +152,30 @@ function clearToken() {
   sessionStorage.removeItem("agol_username");
 }
 
-// --- UI helpers ---
+// --- UI ---
 function showLoggedIn() {
-  loginBtn.style.display    = "none";
-  downloadBtn.style.display = "";
-  logoutBtn.style.display   = "";
-  userInfoEl.style.display  = "";
-  userInfoEl.textContent    = `Signed in as ${getUsername()}`;
+  loginBtn.style.display  = "none";
+  openBtn.style.display   = "";
+  logoutBtn.style.display = "";
+  userInfoEl.style.display= "";
+  userInfoEl.textContent  = `Signed in as ${getUsername()}`;
 }
 function showLoggedOut() {
-  loginBtn.style.display    = "";
-  downloadBtn.style.display = "none";
-  logoutBtn.style.display   = "none";
-  userInfoEl.style.display  = "none";
+  loginBtn.style.display  = "";
+  openBtn.style.display   = "none";
+  logoutBtn.style.display = "none";
+  userInfoEl.style.display= "none";
   setStatus("", "");
 }
 function setStatus(type, msg) {
   statusEl.className   = type;
   statusEl.textContent = msg;
 }
-function setProgress(pct) {
-  progressWrap.style.display = pct > 0 ? "block" : "none";
-  progressBar.style.width    = pct + "%";
-}
 
 // --- OAuth popup ---
 let authPopup = null;
 
-function openAuthPopup() {
+loginBtn.addEventListener("click", function() {
   const params = new URLSearchParams({
     client_id:     CONFIG.clientId,
     response_type: "token",
@@ -227,12 +189,12 @@ function openAuthPopup() {
   authPopup = window.open(authUrl, "agol_auth", `width=${w},height=${h},left=${left},top=${top},toolbar=no,menubar=no`);
 
   if (!authPopup) {
-    setStatus("error", "Popup was blocked. Please allow popups for this page.");
+    setStatus("error", "Popup blocked — please allow popups for this page.");
     return;
   }
   loginBtn.disabled = true;
   setStatus("", "Waiting for sign in…");
-}
+});
 
 window.addEventListener("message", function(event) {
   if (event.origin !== "https://aspraggins.github.io") return;
@@ -246,129 +208,19 @@ window.addEventListener("message", function(event) {
   setStatus("success", "Signed in successfully.");
 });
 
-loginBtn.addEventListener("click", openAuthPopup);
 logoutBtn.addEventListener("click", function() { clearToken(); showLoggedOut(); });
 
-// --- Feature service fetch with pagination ---
-async function fetchAllFeatures(token) {
-  const outFields = Object.keys(CONFIG.fields).join(",");
-
-  // --- Count query ---
-  const countUrl = new URL(CONFIG.featureServiceUrl + "/query");
-  countUrl.searchParams.set("where",           "1=1");
-  countUrl.searchParams.set("returnCountOnly",  "true");
-  countUrl.searchParams.set("f",                "json");
-  countUrl.searchParams.set("token",            token);
-
-  console.log("[shelter_export] COUNT URL:", countUrl.toString().replace(token, "TOKEN_HIDDEN"));
-  const countResp = await fetch(countUrl.toString());
-  const countData = await countResp.json();
-  console.log("[shelter_export] COUNT RESPONSE:", countData);
-
-  if (countData.error) throw new Error(countData.error.message || JSON.stringify(countData.error));
-  const total = countData.count || 0;
-  console.log("[shelter_export] Total records:", total);
-
-  let allFeatures = [], offset = 0;
-
-  while (true) {
-    const url = new URL(CONFIG.featureServiceUrl + "/query");
-    url.searchParams.set("where",             "1=1");
-    url.searchParams.set("outFields",         outFields);
-    url.searchParams.set("returnGeometry",    "false");
-    url.searchParams.set("resultOffset",      offset);
-    url.searchParams.set("resultRecordCount", CONFIG.pageSize);
-    url.searchParams.set("f",                 "json");
-    url.searchParams.set("token",             token);
-
-    console.log("[shelter_export] QUERY URL:", url.toString().replace(token, "TOKEN_HIDDEN"));
-    const resp = await fetch(url.toString());
-    const data = await resp.json();
-    console.log("[shelter_export] QUERY RESPONSE (first 500 chars):", JSON.stringify(data).substring(0, 500));
-
-    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-
-    const features = data.features || [];
-    allFeatures = allFeatures.concat(features);
-    setProgress(Math.min(90, Math.round((allFeatures.length / Math.max(total, 1)) * 90)));
-
-    if (!data.exceededTransferLimit && features.length < CONFIG.pageSize) break;
-    offset += features.length;
-    if (offset >= total) break;
-  }
-
-  return { features: allFeatures, total };
-}
-
-// --- CSV export ---
-function exportCSV(features) {
-  const fieldKeys   = Object.keys(CONFIG.fields);
-  const fieldLabels = Object.values(CONFIG.fields);
-
-  const rows = features.map(f =>
-    fieldKeys.reduce((obj, key, i) => {
-      obj[fieldLabels[i]] = f.attributes[key] ?? "";
-      return obj;
-    }, {})
-  );
-
-  const csv  = Papa.unparse(rows, { columns: fieldLabels });
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url  = URL.createObjectURL(blob);
-
-  // Open in new tab — direct .click() is blocked inside Dashboard iframes
-  const newTab = window.open(url, "_blank");
-
-  // Fallback: if popup also blocked, show a direct link the user can click
-  if (!newTab) {
-    const a = document.createElement("a");
-    a.href        = url;
-    a.download    = CONFIG.exportFilename + ".csv";
-    a.textContent = "Click here to download your CSV";
-    a.style.cssText = "display:block;margin-top:8px;font-size:12px;color:#0079c1;text-align:center;";
-    document.querySelector(".wrapper").appendChild(a);
-  }
-}
-
-// --- Download handler ---
-downloadBtn.addEventListener("click", async function() {
-  const token = getToken();
+// --- Open download app, passing token in hash ---
+openBtn.addEventListener("click", function() {
+  const token   = getToken();
   if (!token) { clearToken(); showLoggedOut(); return; }
 
-  downloadBtn.disabled  = true;
-  downloadBtn.innerHTML = '<div class="spinner"></div> Fetching…';
-  setProgress(5);
-  setStatus("", "");
+  const expires  = sessionStorage.getItem("agol_expires");
+  const username = getUsername();
 
-  try {
-    const { features } = await fetchAllFeatures(token);
-
-    if (features.length === 0) {
-      setStatus("warn", "No records found.");
-      setProgress(0);
-      return;
-    }
-
-    exportCSV(features);
-    setProgress(100);
-    setStatus("success", `✓ ${features.length.toLocaleString()} records downloaded.`);
-    setTimeout(() => setProgress(0), 2000);
-
-  } catch(err) {
-    console.error("[shelter_export] DOWNLOAD ERROR:", err);
-    if (err.message?.includes("498") || err.message?.includes("499") || err.message?.toLowerCase().includes("token")) {
-      clearToken(); showLoggedOut();
-      setStatus("error", "Session expired — please sign in again.");
-    } else {
-      setStatus("error", "Error: " + err.message);
-    }
-    setProgress(0);
-  } finally {
-    downloadBtn.disabled  = false;
-    downloadBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-      <path d="M7.5 1v9M3.5 7l4 4 4-4M1.5 13h12" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg> Download CSV`;
-  }
+  // Pass token via hash — download app strips it from URL immediately on load
+  const url = `${CONFIG.downloadAppUrl}#token=${encodeURIComponent(token)}&expires=${expires}&username=${encodeURIComponent(username)}`;
+  window.open(url, "_blank");
 });
 
 // --- Init ---
