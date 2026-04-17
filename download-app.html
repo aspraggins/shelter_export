@@ -465,10 +465,13 @@ function exportCSV(features) {
   const a    = document.createElement("a");
   a.href     = url;
   a.download = CONFIG.exportFilename + ".csv";
+  a.style.display = "none";
   document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
 }
 
 // --- Download handler ---
