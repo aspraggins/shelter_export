@@ -459,9 +459,8 @@ function exportCSV(features) {
     }, {})
   );
 
-  const csv      = Papa.unparse(rows, { columns: fieldLabels });
-  const blob     = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url      = URL.createObjectURL(blob);
+  const csv  = Papa.unparse(rows, { columns: fieldLabels });
+  const dataUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
 
   // Remove any previous download link
   const old = document.getElementById("csv-download-link");
@@ -469,7 +468,7 @@ function exportCSV(features) {
 
   const a = document.createElement("a");
   a.id       = "csv-download-link";
-  a.href     = url;
+  a.href     = dataUri;
   a.download = CONFIG.exportFilename + ".csv";
   a.textContent = "⬇ Click here to save your CSV file";
   a.style.cssText = "display:block;margin-top:14px;text-align:center;font-size:14px;font-weight:600;color:var(--primary);padding:10px;border:2px dashed var(--primary);border-radius:6px;";
